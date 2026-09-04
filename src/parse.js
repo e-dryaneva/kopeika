@@ -62,6 +62,27 @@ export function fallbackCategory(categories, wantIncome) {
 }
 
 /**
+ * Разбирает свободное описание вроде «кофе с собой»: первое узнанное слово
+ * становится категорией, остальные — заметкой. Категории нет — вернёт null.
+ */
+export function matchCategory(text, categories) {
+  const lookup = buildLookup(categories);
+  const words = String(text ?? "").trim().split(/\s+/).filter(Boolean);
+
+  let category = null;
+  const noteWords = [];
+  for (const word of words) {
+    const id = lookup.get(normalize(word));
+    if (category === null && id !== undefined) {
+      category = categories.find((c) => c.id === id);
+    } else {
+      noteWords.push(word);
+    }
+  }
+  return { category, note: noteWords.join(" ") };
+}
+
+/**
  * Возвращает { amountKop, category, note } или null, если суммы в строке нет.
  */
 export function parseText(input, categories) {

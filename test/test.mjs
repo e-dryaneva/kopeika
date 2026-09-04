@@ -77,8 +77,15 @@ res = await jcall("/api/entry", { method: "POST", body: { amount: 700, category:
 check("по названию категории", res.entry.cat_name, "Покупки");
 
 check("нет суммы — 400", (await call("/api/entry", { method: "POST", body: { amount: 0 } })).status, 400);
-check("чужая категория — 400",
-      (await call("/api/entry", { method: "POST", body: { amount: 10, category: "динозавры" } })).status, 400);
+// Два вопроса в быстрой команде: сумма отдельно, свободное слово отдельно.
+res = await jcall("/api/entry", { method: "POST", body: { amount: 250, category: "кофе" } });
+check("синоним в поле category", res.entry.cat_name, "Кафе");
+res = await jcall("/api/entry", { method: "POST", body: { amount: 400, category: "такси домой" } });
+check("лишние слова уходят в заметку", [res.entry.cat_name, res.entry.note], ["Транспорт", "домой"]);
+res = await jcall("/api/entry", { method: "POST", body: { amount: 10, category: "динозавры" } });
+check("незнакомое слово не теряется", [res.entry.cat_name, res.entry.note], ["Прочее", "динозавры"]);
+check("несуществующий category_id — 400",
+      (await call("/api/entry", { method: "POST", body: { amount: 10, category_id: 99999 } })).status, 400);
 
 // --- Свои категории ---
 const made = await jcall("/api/categories", { method: "POST", body: { name: "Кот", emoji: "🐈", color: "#FFD60A" } });

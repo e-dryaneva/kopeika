@@ -1,7 +1,7 @@
 import pageShell from "./page.html";
 import appScript from "./app.script.html";
 import { ICON_512_BASE64 } from "./icon.js";
-import { PALETTE, fallbackCategory, parseAmountKop, parseText } from "./parse.js";
+import { PALETTE, fallbackCategory, matchCategory, parseAmountKop, parseText } from "./parse.js";
 
 // Клиентский скрипт лежит отдельным файлом и вклеивается в страницу один раз при старте.
 const page = pageShell.replace("<!--APP-->", () => appScript);
@@ -111,12 +111,20 @@ async function addEntry(request, env) {
 
     if (body.category_id !== undefined) {
       category = categories.find((c) => c.id === Number(body.category_id));
+      if (!category) {
+        return json({ ok: false, message: `Неизвестная категория: ${body.category_id}` }, 400);
+      }
     } else if (body.category !== undefined) {
-      const wanted = String(body.category).trim().toLowerCase();
-      category = categories.find((c) => c.name.toLowerCase() === wanted);
-    }
-    if (!category && (body.category_id !== undefined || body.category !== undefined)) {
-      return json({ ok: false, message: `Неизвестная категория: ${body.category ?? body.category_id}` }, 400);
+      // Свободное слово из быстрой команды: «кофе» → Кафе, «такси домой» → Транспорт + заметка.
+      const raw = String(body.category).trim();
+      const guess = matchCategory(raw, categories);
+      if (guess.category) {
+        category = guess.category;
+        if (guess.note) note = note ? `${guess.note} ${note}` : guess.note;
+      } else if (raw) {
+        // Ничего не узнали — слово не теряем, оно становится заметкой.
+        note = note ? `${raw} ${note}` : raw;
+      }
     }
     category ??= fallbackCategory(categories, Boolean(body.is_income));
   }
