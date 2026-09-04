@@ -1,0 +1,803 @@
+<script type="module">
+const S = {
+  token: localStorage.getItem("kopeika-token") || "",
+  theme: localStorage.getItem("kopeika-theme") || "dark",
+  tab: "entry",
+  categories: [], palette: [], settings: { monthly_budget_kop: 0 },
+  month: "", entries: [], totals: {},
+  kind: "expense",
+  amount: "",
+  categoryId: null,
+  draft: null,
+  filters: { cats: new Set(), range: null },
+  sheet: null,
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const MONTHS_NOM = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+const MONTHS_PREP = ["январе","феврале","марте","апреле","мае","июне","июле","августе","сентябре","октябре","ноябре","декабре"];
+const MONTHS_GEN = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+
+const RANGES = [
+  { id: "any",  label: "Любая" },
+  { id: "s",    label: "до 500 ₽",        max: 50000 },
+  { id: "m",    label: "500 – 2 000 ₽",   min: 50000,   max: 200000 },
+  { id: "l",    label: "2 000 – 10 000 ₽", min: 200000, max: 1000000 },
+  { id: "xl",   label: "больше 10 000 ₽",  min: 1000000 },
+];
+
+// ---------- Формат ----------
+
+function money(kop) {
+  const rub = Math.abs(kop) / 100;
+  const fraction = Number.isInteger(rub) ? 0 : 2;
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency", currency: "RUB",
+    minimumFractionDigits: fraction, maximumFractionDigits: fraction,
+  }).format(rub);
+}
+const signed = (kop) => (kop < 0 ? "− " : "+ ") + money(kop);
+/** Для прикидочных чисел — темпа и среднего — копейки только мешают. */
+const moneyRound = (kop) => money(Math.round(kop / 100) * 100);
+
+/** Рубли из поля ввода в копейки. Пусто или мусор — 0, то есть «без лимита». */
+const rublesToKop = (text) => {
+  const cleaned = String(text ?? "").replace(/[\s\u00A0\u202F]/g, "").replace(",", ".");
+  if (!cleaned) return 0;
+  const value = Number(cleaned);
+  return Number.isFinite(value) && value > 0 ? Math.round(value * 100) : 0;
+};
+const kopToField = (kop) => (kop ? String(kop / 100) : "");
+
+const monthParts = (m) => m.split("-").map(Number);
+const monthLabel = (m) => { const [y, mo] = monthParts(m); return `${MONTHS_NOM[mo - 1]} ${y}`; };
+const daysIn = (m) => { const [y, mo] = monthParts(m); return new Date(y, mo, 0).getDate(); };
+
+function currentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+function shiftMonth(m, delta) {
+  const [y, mo] = monthParts(m);
+  const d = new Date(y, mo - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function todayLocal() {
+  const now = new Date();
+  return `${currentMonth()}-${String(now.getDate()).padStart(2, "0")}`;
+}
+function dayLabel(date) {
+  const today = todayLocal();
+  if (date === today) return "Сегодня";
+  const [y, m, d] = date.split("-").map(Number);
+  const yest = new Date(); yest.setDate(yest.getDate() - 1);
+  const yestStr = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, "0")}-${String(yest.getDate()).padStart(2, "0")}`;
+  if (date === yestStr) return "Вчера";
+  return `${d} ${MONTHS_GEN[m - 1]}`;
+}
+
+// ---------- Сеть ----------
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: { ...(options.headers || {}), "content-type": "application/json",
+               authorization: `Bearer ${S.token}` },
+  });
+  if (response.status === 401) {
+    localStorage.removeItem("kopeika-token");
+    S.token = "";
+    showGate("Токен не подошёл.");
+    throw new Error("unauthorized");
+  }
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.message || "Ошибка");
+  return data;
+}
+const send = (path, method, body) => api(path, { method, body: JSON.stringify(body) });
+
+function showGate(message = "") {
+  $("gate").classList.add("on");
+  $("tabs").hidden = true;
+  for (const el of document.querySelectorAll(".screen")) el.classList.remove("on");
+  $("gate-error").textContent = message;
+}
+
+// ---------- Тема ----------
+
+const SUN = "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M3 12h2M19 12h2M5.6 18.4l1.4-1.4M17 7l1.4-1.4";
+const MOON = "M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z";
+
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", S.theme === "light" ? "light" : "dark");
+  $("theme-path").setAttribute("d", S.theme === "light" ? MOON : SUN);
+  document.querySelector('meta[name="theme-color"]')
+    .setAttribute("content", S.theme === "light" ? "#F2F2F7" : "#000000");
+}
+
+// ---------- Экран «Запись» ----------
+
+const catsOfKind = (kind = S.kind) => S.categories.filter((c) => Boolean(c.is_income) === (kind === "income"));
+
+function amountText(amount, kind) {
+  if (!amount) return "0 ₽";
+  const [head, tail] = amount.split(".");
+  const grouped = Number(head || 0).toLocaleString("ru-RU");
+  const body = tail !== undefined ? `${grouped},${tail}` : grouped;
+  return `${kind === "income" ? "+" : "−"} ${body} ₽`;
+}
+
+/** Ужимает шрифт, пока сумма не поместится в одну строку. */
+function fitAmount(el, max = 64) {
+  // На скрытом экране ширины нет — мерить нечего, иначе шрифт схлопнется до минимума.
+  if (!el || !el.clientWidth) return;
+  let size = max;
+  el.style.fontSize = size + "px";
+  while (el.scrollWidth > el.clientWidth && size > 22) {
+    size -= 2;
+    el.style.fontSize = size + "px";
+  }
+}
+
+/** Один шаг набора на нумпаде. Возвращает новую строку суммы. */
+function applyKey(amount, key) {
+  if (key === "back") return amount.slice(0, -1);
+  if (key === ".") return amount.includes(".") ? amount : (amount || "0") + ".";
+  const [head, tail] = amount.split(".");
+  if (tail !== undefined && tail.length >= 2) return amount;
+  if (tail === undefined && head.replace("0", "").length >= 9) return amount;
+  return amount === "0" ? key : amount + key;
+}
+
+/** Разметка «сегмент + сумма + чипы + нумпад», общая для экрана записи и шторки. */
+const padMarkup = (attr) => ["1","2","3","4","5","6","7","8","9",".","0","back"]
+  .map((k) => `<button ${attr}="${k}">${k === "back" ? "⌫" : k}</button>`).join("");
+
+function renderEntry() {
+  const budget = S.settings.monthly_budget_kop;
+  const [, mo] = monthParts(currentMonth());
+  if (budget > 0) {
+    const left = budget - (S.totals.expense || 0);
+    $("limit-k").textContent = `Осталось в ${MONTHS_PREP[mo - 1]}`;
+    $("limit-v").textContent = money(left);
+    $("limit-v").style.color = left >= 0 ? "var(--green)" : "var(--red)";
+  } else {
+    $("limit-k").textContent = "Лимит на месяц";
+    $("limit-v").textContent = "задать";
+    $("limit-v").style.color = "var(--blue)";
+  }
+
+  $("seg-expense").classList.toggle("on", S.kind === "expense");
+  $("seg-income").classList.toggle("on", S.kind === "income");
+
+  const el = $("amount");
+  el.textContent = amountText(S.amount, S.kind);
+  el.style.color = !S.amount ? "var(--dim)" : (S.kind === "income" ? "var(--green)" : "var(--text)");
+  fitAmount(el);
+
+  $("entry-cats").innerHTML = catsOfKind().map((c) => {
+    const on = c.id === S.categoryId ? " on" : "";
+    return `<button class="chip${on}" data-cat="${c.id}">${esc(c.name)}</button>`;
+  }).join("") + `<button class="chip add" id="open-cats">＋ Категория</button>`;
+
+  const ready = Number(S.amount) > 0 && S.categoryId !== null;
+  $("save").classList.toggle("on", ready);
+  $("save").disabled = !ready;
+}
+
+/** Открывает операцию на правку в шторке. */
+function openEntrySheet(id) {
+  const entry = S.entries.find((e) => e.id === id);
+  if (!entry) return;
+  S.draft = {
+    id,
+    kind: entry.is_income ? "income" : "expense",
+    amount: String(entry.amount_kop / 100),
+    // Если категорию успели удалить, её придётся выбрать заново.
+    categoryId: S.categories.find((c) => c.id === entry.category_id)?.id
+      ?? S.categories.find((c) => c.name === entry.cat_name && Boolean(c.is_income) === Boolean(entry.is_income))?.id
+      ?? null,
+    note: entry.note,
+    date: entry.local_date,
+  };
+  openSheet("entry");
+}
+
+/** Забирает то, что человек уже набрал, чтобы перерисовка не стёрла ввод. */
+function syncDraft() {
+  if (!S.draft || !$("d-note")) return;
+  S.draft.note = $("d-note").value;
+  S.draft.date = $("d-date").value;
+}
+
+/** Крупная сумма в шторке подстраивается под высоту экрана. */
+const draftAmountSize = () => (window.innerHeight <= 720 ? 34 : 44);
+
+/** Обновляет только сумму в шторке, не перестраивая нумпад и поля. */
+function renderDraftAmount() {
+  const el = $("d-amount");
+  if (!el) return;
+  const { amount, kind, categoryId } = S.draft;
+  el.textContent = amountText(amount, kind);
+  el.style.color = !amount ? "var(--dim)" : (kind === "income" ? "var(--green)" : "var(--text)");
+  fitAmount(el, draftAmountSize());
+  $("d-save").classList.toggle("on", Number(amount) > 0 && categoryId !== null);
+}
+
+async function saveDraft() {
+  syncDraft();
+  const draft = S.draft;
+  if (!draft || draft.categoryId === null || !(Number(draft.amount) > 0)) return;
+  await send(`/api/entry/${draft.id}`, "PATCH", {
+    amount: draft.amount, category_id: draft.categoryId,
+    note: draft.note, local_date: draft.date,
+  });
+  closeSheet();
+  await reload();
+}
+
+async function deleteDraft() {
+  if (!S.draft) return;
+  if (!confirm("Удалить операцию?")) return;
+  await api(`/api/entry/${S.draft.id}`, { method: "DELETE" });
+  closeSheet();
+  await reload();
+}
+
+function pressKey(key) {
+  S.amount = applyKey(S.amount, key);
+  renderEntry();
+}
+
+async function save() {
+  if (!(Number(S.amount) > 0) || S.categoryId === null) return;
+  const result = await send("/api/entry", "POST", {
+    amount: S.amount, category_id: S.categoryId, note: $("note").value.trim(),
+  });
+  S.amount = "";
+  $("note").value = "";
+
+  // Экран подтверждения закрывается только кнопкой «Понятно».
+  $("entry").hidden = true;
+  $("done").hidden = false;
+  $("done-sub").textContent = result.message;
+
+  await reload();
+}
+
+// ---------- Экран «Операции» ----------
+
+function filtered() {
+  return S.entries.filter((e) => {
+    if (S.filters.cats.size && !S.filters.cats.has(e.cat_name)) return false;
+    const range = RANGES.find((r) => r.id === S.filters.range);
+    if (range && range.id !== "any") {
+      if (range.min !== undefined && e.amount_kop < range.min) return false;
+      if (range.max !== undefined && e.amount_kop >= range.max) return false;
+    }
+    return true;
+  });
+}
+
+function renderList() {
+  const rows = filtered();
+  const expense = rows.filter((e) => !e.is_income).reduce((s, e) => s + e.amount_kop, 0);
+  const income = rows.filter((e) => e.is_income).reduce((s, e) => s + e.amount_kop, 0);
+
+  const range = RANGES.find((r) => r.id === S.filters.range);
+  const tagsLabel = S.filters.cats.size === 0 ? "Теги"
+    : S.filters.cats.size === 1 ? [...S.filters.cats][0]
+    : `${S.filters.cats.size} категории`;
+  const active = S.filters.cats.size > 0 || (range && range.id !== "any");
+
+  $("filters").innerHTML = [
+    `<button class="filter" data-sheet="month">${esc(monthLabel(S.month))}<span class="caret">▾</span></button>`,
+    `<button class="filter ${S.filters.cats.size ? "set" : ""}" data-sheet="tags">${esc(tagsLabel)}<span class="caret">▾</span></button>`,
+    `<button class="filter ${range && range.id !== "any" ? "set" : ""}" data-sheet="range">${esc(range && range.id !== "any" ? range.label : "Сумма")}<span class="caret">▾</span></button>`,
+    active ? `<button class="filter reset" id="reset-filters">✕ Сбросить</button>` : "",
+  ].join("");
+
+  $("l-expense").textContent = money(expense);
+  $("l-income").textContent = "+ " + money(income);
+  $("found").textContent = `${rows.length} оп. · расходы ${money(expense)}`;
+
+  if (!rows.length) {
+    $("groups").innerHTML = `<div class="nothing"><div class="t">Ничего не найдено</div><div class="s">Попробуйте изменить фильтры</div></div>`;
+    return;
+  }
+
+  const byDay = new Map();
+  for (const entry of rows) {
+    if (!byDay.has(entry.local_date)) byDay.set(entry.local_date, []);
+    byDay.get(entry.local_date).push(entry);
+  }
+
+  $("groups").innerHTML = [...byDay.entries()].map(([date, items]) => {
+    const total = items.reduce((s, e) => s + (e.is_income ? e.amount_kop : -e.amount_kop), 0);
+    const list = items.map((e) => `
+      <div class="oprow" data-edit="${e.id}">
+        <div class="opicon">${esc(e.cat_emoji)}</div>
+        <div class="opmain">
+          <div class="opcat">${esc(e.cat_name)}</div>
+          ${e.note ? `<div class="opnote">${esc(e.note)}</div>` : ""}
+        </div>
+        <div class="opamount" style="${e.is_income ? "color:var(--green)" : ""}">${signed(e.is_income ? e.amount_kop : -e.amount_kop)}</div>
+      </div>`).join("");
+    return `<div style="display:flex;flex-direction:column;gap:6px">
+      <div class="dayhead"><div class="l">${esc(dayLabel(date))}</div><div class="r num">${signed(total)}</div></div>
+      <div class="card" style="overflow:hidden">${list}</div>
+    </div>`;
+  }).join("");
+}
+
+// ---------- Экран «Обзор» ----------
+
+function renderStats() {
+  $("s-month").textContent = monthLabel(S.month);
+  $("s-next").disabled = S.month >= currentMonth();
+
+  const budget = S.settings.monthly_budget_kop;
+  const expense = S.totals.expense || 0;
+  const total = daysIn(S.month);
+  const isNow = S.month === currentMonth();
+  const elapsed = isNow ? Number(todayLocal().slice(8)) : total;
+
+  const [, selectedMonth] = monthParts(S.month);
+  $("spent-k").textContent = `Потрачено в ${MONTHS_PREP[selectedMonth - 1]}`;
+  $("spent-value").textContent = money(expense);
+
+  $("budget-track").hidden = budget <= 0;
+
+  if (budget > 0) {
+    const left = budget - expense;
+    const over = left < 0;
+    $("budget-of").textContent = money(budget);
+    $("budget-fill").style.width = Math.min(100, (expense / budget) * 100) + "%";
+
+    const expected = budget * (elapsed / total);
+    const diff = Math.round(expected - expense);
+    const pace = diff >= 0
+      ? `ниже графика на ${moneyRound(diff)}`
+      : `выше графика на ${moneyRound(-diff)}`;
+    $("budget-pace").textContent = over
+      ? `Превышен на ${money(-left)} · ${pace}`
+      : `Осталось ${money(left)} · ${pace}`;
+    $("budget-pace").classList.toggle("over", over);
+  } else {
+    $("budget-of").textContent = "не задан";
+    $("budget-pace").textContent = "Нажми, чтобы задать";
+    $("budget-pace").classList.remove("over");
+  }
+
+  // Расходы по дням.
+  const perDay = new Array(total).fill(0);
+  for (const entry of S.entries) {
+    if (entry.is_income) continue;
+    perDay[Number(entry.local_date.slice(8)) - 1] += entry.amount_kop;
+  }
+  const peak = Math.max(...perDay, 1);
+  $("days-avg").textContent = `в среднем ${moneyRound(expense / Math.max(elapsed, 1))} в день`;
+  $("days").innerHTML = perDay.map((value, index) => {
+    const future = isNow && index + 1 > elapsed;
+    const height = value ? Math.max(3, (value / peak) * 100) : 3;
+    const color = future ? "var(--card2)" : (value ? "var(--blue)" : "var(--card3)");
+    return `<div><i style="height:${height}%;background:${color}"></i></div>`;
+  }).join("");
+  $("days-axis").innerHTML = [1, 8, 16, total].map((d) => `<div>${d}</div>`).join("");
+
+  // Расходы по категориям.
+  const grouped = new Map();
+  for (const entry of S.entries) {
+    if (entry.is_income) continue;
+    const key = entry.cat_name;
+    const prev = grouped.get(key) || { total: 0, emoji: entry.cat_emoji, color: entry.cat_color };
+    prev.total += entry.amount_kop;
+    grouped.set(key, prev);
+  }
+  const slices = [...grouped.entries()].sort((a, b) => b[1].total - a[1].total);
+
+  // Категории с лимитом показываем даже без трат — лимит тоже информация.
+  for (const category of S.categories) {
+    if (category.is_income || !category.limit_kop || grouped.has(category.name)) continue;
+    slices.push([category.name, { total: 0, emoji: category.emoji, color: category.color }]);
+  }
+
+  $("bycat-card").hidden = slices.length === 0;
+
+  // Во всех строках одно и то же: процент — сколько осталось от лимита,
+  // полоса — насколько он выбран. Без лимита показывать нечему.
+  $("bycat").innerHTML = slices.map(([name, s]) => {
+    const limit = S.categories.find((c) => !c.is_income && c.name === name)?.limit_kop || 0;
+    const left = limit - s.total;
+    const over = limit > 0 && left < 0;
+    const used = limit ? Math.min(1, s.total / limit) : 0;
+
+    // Сверху — сколько потрачено, снизу — остаток лимита.
+    // Без лимита строка остаётся пустой: ни полосы, ни подписи.
+    const tail = !limit ? "" : `
+      <div class="track"><div style="width:${used * 100}%"></div></div>
+      <div class="cap${over ? " over" : ""}">${
+        over ? `превышен на ${money(-left)}` : `осталось ${money(left)}`
+      }</div>`;
+
+    return `
+    <div class="catrow" data-limits>
+      <div class="line">
+        <div class="e">${esc(s.emoji)}</div>
+        <div class="n">${esc(name)}</div>
+        <div class="rest num">${money(s.total)}</div>
+      </div>${tail}
+    </div>`;
+  }).join("");
+}
+
+// ---------- Шторки ----------
+
+function openSheet(kind) {
+  S.sheet = kind;
+  const sheet = $("sheet");
+  sheet.hidden = false;
+  $("sheet-body").classList.toggle("tight", kind === "entry");
+  const left = $("sheet-left");
+  left.hidden = kind === "cats" || kind === "limits" || kind === "entry";
+  left.textContent = "Сбросить";
+  $("sheet-done").textContent = kind === "entry" ? "Закрыть" : "Готово";
+  $("sheet-title").textContent =
+    kind === "month" ? "Месяц" : kind === "tags" ? "Категории" : kind === "range" ? "Сумма"
+    : kind === "entry" ? "Операция" : kind === "limits" ? "Лимиты" : "Категории";
+  renderSheet();
+}
+const closeSheet = () => {
+  $("sheet").hidden = true;
+  $("sheet-body").innerHTML = "";
+  S.sheet = null;
+  S.draft = null;
+};
+
+const EMOJI_HEAD = /^(\p{Extended_Pictographic}️?(?:‍\p{Extended_Pictographic}️?)*)\s*/u;
+
+function renderSheet() {
+  const body = $("sheet-body");
+
+  if (S.sheet === "month") {
+    const months = [];
+    let cursor = currentMonth();
+    for (let i = 0; i < 12; i++) { months.push(cursor); cursor = shiftMonth(cursor, -1); }
+    body.innerHTML = `<div class="sheetlist">${months.map((m) => `
+      <button class="sheetrow" data-month="${m}">
+        <div class="lbl">${esc(monthLabel(m))}</div>
+        <div class="tick" style="${m === S.month ? "" : "visibility:hidden"}">✓</div>
+      </button>`).join("")}</div>`;
+    return;
+  }
+
+  if (S.sheet === "tags") {
+    const names = [...new Set([...S.categories.map((c) => c.name), ...S.entries.map((e) => e.cat_name)])];
+    body.innerHTML = `<div class="sheetlist">${names.map((name) => {
+      const meta = S.categories.find((c) => c.name === name)
+        || S.entries.find((e) => e.cat_name === name) || {};
+      const emoji = meta.emoji ?? meta.cat_emoji ?? "📦";
+      const color = meta.color ?? meta.cat_color ?? "#8E8E93";
+      const on = S.filters.cats.has(name);
+      return `<button class="sheetrow" data-tag="${esc(name)}">
+        <div class="dotsq" style="background:${color}22">${esc(emoji)}</div>
+        <div class="lbl">${esc(name)}</div>
+        <div class="tick" style="${on ? "" : "visibility:hidden"}">✓</div>
+      </button>`;
+    }).join("")}</div>`;
+    return;
+  }
+
+  if (S.sheet === "limits") {
+    const rows = S.categories.filter((c) => !c.is_income).map((c) => `
+      <div class="limitrow">
+        <div class="e">${esc(c.emoji)}</div>
+        <div class="lbl">${esc(c.name)}</div>
+        <input inputmode="decimal" data-lim="${c.id}" placeholder="—" value="${kopToField(c.limit_kop)}">
+      </div>`).join("");
+    body.innerHTML = `
+      <div class="sheetlist">
+        <div class="limitrow">
+          <div class="lbl">Общий лимит на месяц</div>
+          <input inputmode="decimal" id="lim-total" placeholder="—"
+                 value="${kopToField(S.settings.monthly_budget_kop)}">
+        </div>
+      </div>
+      <div class="limithead">ПО КАТЕГОРИЯМ</div>
+      <div class="sheetlist">${rows}</div>
+      <div class="limithint">Суммы в рублях. Пустое поле или ноль — без лимита.</div>`;
+    return;
+  }
+
+  if (S.sheet === "entry") {
+    const draft = S.draft;
+    body.innerHTML = `<div class="form">
+      <div class="seg">
+        <button data-dkind="expense" class="${draft.kind === "expense" ? "on" : ""}">Расход</button>
+        <button data-dkind="income" class="${draft.kind === "income" ? "on" : ""}">Доход</button>
+      </div>
+      <div class="amountview num" id="d-amount"></div>
+      <div class="chips">${catsOfKind(draft.kind).map((c) =>
+        `<button class="chip${c.id === draft.categoryId ? " on" : ""}" data-dcat="${c.id}">${esc(c.name)}</button>`
+      ).join("")}</div>
+      <input class="forminput" id="d-note" placeholder="Заметка" value="${esc(draft.note)}">
+      <input class="forminput" id="d-date" type="date" value="${esc(draft.date)}">
+      <div class="pad">${padMarkup("data-dkey")}</div>
+      <button class="savebtn" id="d-save">Сохранить</button>
+      <button class="delbtn" id="d-delete">Удалить</button>
+    </div>`;
+    renderDraftAmount();
+    return;
+  }
+
+  if (S.sheet === "range") {
+    body.innerHTML = `<div class="sheetlist">${RANGES.map((r) => {
+      const on = (S.filters.range ?? "any") === r.id;
+      return `<button class="sheetrow" data-range="${r.id}">
+        <div class="lbl">${esc(r.label)}</div>
+        <div class="tick" style="${on ? "" : "visibility:hidden"}">✓</div>
+      </button>`;
+    }).join("")}</div>`;
+    return;
+  }
+
+  // Редактор категорий текущего вида.
+  body.innerHTML = `<div class="catedit">
+    ${catsOfKind().map((c) => `
+      <div class="r">
+        <button class="dotsq" data-cycle="${c.id}" style="background:${c.color}">${esc(c.emoji)}</button>
+        <input value="${esc(c.name)}" data-rename="${c.id}" placeholder="Название">
+        <button class="del" data-remove="${c.id}">✕</button>
+      </div>`).join("")}
+    <button class="adder" id="add-cat">＋ Добавить категорию</button>
+    <div class="hint">Цвет меняется тапом по квадрату. Эмодзи можно вписать в начало названия. Удаление не трогает уже записанные операции.</div>
+  </div>`;
+}
+
+// ---------- Загрузка и переключение ----------
+
+async function reload() {
+  const data = await api(`/api/entries?month=${S.month}`);
+  S.entries = data.entries;
+  S.totals = data.totals;
+  render();
+}
+
+function render() {
+  for (const el of document.querySelectorAll(".screen")) el.classList.remove("on");
+  $(`screen-${S.tab}`).classList.add("on");
+  for (const button of document.querySelectorAll("#tabs button")) {
+    button.classList.toggle("on", button.dataset.tab === S.tab);
+  }
+  if (S.tab === "entry") renderEntry();
+  if (S.tab === "list") renderList();
+  if (S.tab === "stats") renderStats();
+  if (S.sheet && S.sheet !== "limits") { syncDraft(); renderSheet(); }
+}
+
+function goTab(tab) {
+  if (tab !== "entry") { $("done").hidden = true; $("entry").hidden = false; }
+  S.tab = tab;
+  $("scroll").scrollTop = 0;
+  render();
+}
+
+/** Пересобирает то, на что влияют лимиты, не трогая открытую шторку. */
+function refreshAfterLimits() {
+  if (S.tab === "stats") renderStats();
+  if (S.tab === "entry") renderEntry();
+}
+
+// ---------- События ----------
+
+document.addEventListener("click", async (event) => {
+  const target = event.target;
+  const hit = (name) => target.closest(`[${name}]`);
+
+  const tab = target.closest("#tabs button");
+  if (tab) return goTab(tab.dataset.tab);
+
+  if (target.closest("#seg-expense")) { S.kind = "expense"; S.categoryId = catsOfKind()[0]?.id ?? null; return renderEntry(); }
+  if (target.closest("#seg-income"))  { S.kind = "income";  S.categoryId = catsOfKind()[0]?.id ?? null; return renderEntry(); }
+  if (target.closest("#limit-v") || target.closest("#budget-card")
+      || target.closest("#limits-open") || target.closest("[data-limits]")) return openSheet("limits");
+
+  const key = hit("data-key");
+  if (key) return pressKey(key.dataset.key);
+
+  const chip = hit("data-cat");
+  if (chip) { S.categoryId = Number(chip.dataset.cat); return renderEntry(); }
+
+  if (target.closest("#save")) return save();
+  if (target.closest("#done-ok")) {
+    $("done").hidden = true;
+    $("entry").hidden = false;
+    return renderEntry();
+  }
+  if (target.closest("#open-cats")) return openSheet("cats");
+
+  if (target.closest("#s-prev")) { S.month = shiftMonth(S.month, -1); return reload(); }
+  if (target.closest("#s-next")) { S.month = shiftMonth(S.month, 1); return reload(); }
+  if (target.closest("#theme-toggle")) {
+    S.theme = S.theme === "dark" ? "light" : "dark";
+    localStorage.setItem("kopeika-theme", S.theme);
+    return applyTheme();
+  }
+
+  const sheetButton = hit("data-sheet");
+  if (sheetButton) return openSheet(sheetButton.dataset.sheet);
+  if (target.closest("#reset-filters")) {
+    S.filters = { cats: new Set(), range: null };
+    return renderList();
+  }
+
+  const edit = hit("data-edit");
+  if (edit) return openEntrySheet(Number(edit.dataset.edit));
+
+  // Поля внутри шторки правки.
+  const draftKind = hit("data-dkind");
+  if (draftKind && S.draft) {
+    syncDraft();
+    S.draft.kind = draftKind.dataset.dkind;
+    S.draft.categoryId = catsOfKind(S.draft.kind)[0]?.id ?? null;
+    return renderSheet();
+  }
+  const draftCat = hit("data-dcat");
+  if (draftCat && S.draft) {
+    syncDraft();
+    S.draft.categoryId = Number(draftCat.dataset.dcat);
+    return renderSheet();
+  }
+  const draftKey = hit("data-dkey");
+  if (draftKey && S.draft) {
+    S.draft.amount = applyKey(S.draft.amount, draftKey.dataset.dkey);
+    return renderDraftAmount();
+  }
+  if (target.closest("#d-save")) return saveDraft();
+  if (target.closest("#d-delete")) return deleteDraft();
+
+  // Внутри шторок
+  const month = hit("data-month");
+  if (month) { S.month = month.dataset.month; closeSheet(); return reload(); }
+
+  const tag = hit("data-tag");
+  if (tag) {
+    const name = tag.dataset.tag;
+    S.filters.cats.has(name) ? S.filters.cats.delete(name) : S.filters.cats.add(name);
+    renderSheet();
+    return renderList();
+  }
+
+  const range = hit("data-range");
+  if (range) { S.filters.range = range.dataset.range; closeSheet(); return renderList(); }
+
+  const cycle = hit("data-cycle");
+  if (cycle) {
+    const id = Number(cycle.dataset.cycle);
+    const category = S.categories.find((c) => c.id === id);
+    const next = S.palette[(S.palette.indexOf(category.color) + 1) % S.palette.length];
+    const result = await send(`/api/categories/${id}`, "PATCH", { color: next });
+    Object.assign(category, result.category);
+    renderSheet();
+    return reload();
+  }
+
+  const remove = hit("data-remove");
+  if (remove) {
+    const id = Number(remove.dataset.remove);
+    const category = S.categories.find((c) => c.id === id);
+    if (!confirm(`Удалить категорию «${category.name}»? Записанные операции останутся.`)) return;
+    await api(`/api/categories/${id}`, { method: "DELETE" });
+    S.categories = S.categories.filter((c) => c.id !== id);
+    if (S.categoryId === id) S.categoryId = catsOfKind()[0]?.id ?? null;
+    renderSheet();
+    return reload();
+  }
+
+  if (target.closest("#add-cat")) {
+    const answer = prompt("Название категории (можно начать с эмодзи)");
+    if (!answer) return;
+    let name = answer.trim();
+    let emoji = "📦";
+    const match = name.match(EMOJI_HEAD);
+    if (match) { emoji = match[1]; name = name.slice(match[0].length).trim(); }
+    if (!name) return;
+    const used = catsOfKind().length;
+    const result = await send("/api/categories", "POST", {
+      name, emoji, color: S.palette[used % S.palette.length], is_income: S.kind === "income" ? 1 : 0,
+    });
+    S.categories.push(result.category);
+    renderSheet();
+    return reload();
+  }
+
+  if (target.closest("#sheet-done") || target === $("sheet")) return closeSheet();
+  if (target.closest("#sheet-left")) {
+    if (S.sheet === "tags") S.filters.cats.clear();
+    if (S.sheet === "range") S.filters.range = null;
+    if (S.sheet === "month") S.month = currentMonth();
+    renderSheet();
+    if (S.sheet === "month") { closeSheet(); return reload(); }
+    return renderList();
+  }
+});
+
+document.addEventListener("change", async (event) => {
+  // Общий лимит.
+  const total = event.target.closest("#lim-total");
+  if (total) {
+    const kop = rublesToKop(total.value);
+    const result = await send("/api/settings", "PUT", { monthly_budget_kop: kop });
+    S.settings = result.settings;
+    total.value = kopToField(kop);
+    return refreshAfterLimits();
+  }
+
+  // Лимит категории.
+  const lim = event.target.closest("[data-lim]");
+  if (lim) {
+    const id = Number(lim.dataset.lim);
+    const kop = rublesToKop(lim.value);
+    const result = await send(`/api/categories/${id}`, "PATCH", { limit_kop: kop });
+    Object.assign(S.categories.find((c) => c.id === id), result.category);
+    lim.value = kopToField(result.category.limit_kop);
+    return refreshAfterLimits();
+  }
+
+  // Переименование категории.
+  const input = event.target.closest("[data-rename]");
+  if (!input) return;
+  const id = Number(input.dataset.rename);
+  const category = S.categories.find((c) => c.id === id);
+  let name = input.value.trim();
+  let emoji = category.emoji;
+  const match = name.match(EMOJI_HEAD);
+  if (match) { emoji = match[1]; name = name.slice(match[0].length).trim(); }
+  if (!name || (name === category.name && emoji === category.emoji)) return renderSheet();
+  const result = await send(`/api/categories/${id}`, "PATCH", { name, emoji });
+  Object.assign(category, result.category);
+  renderSheet();
+  await reload();
+});
+
+$("token-save").onclick = async () => {
+  S.token = $("token-input").value.trim();
+  if (!S.token) return;
+  try {
+    await start();
+    localStorage.setItem("kopeika-token", S.token);
+  } catch { /* сообщение уже показано */ }
+};
+$("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("token-save").click(); });
+window.addEventListener("resize", () => {
+  if (S.tab === "entry") fitAmount($("amount"));
+  if (S.sheet === "entry") fitAmount($("d-amount"), draftAmountSize());
+});
+
+// ---------- Старт ----------
+
+$("pad").innerHTML = padMarkup("data-key");
+
+async function start() {
+  const boot = await api("/api/bootstrap");
+  S.categories = boot.categories;
+  S.settings = boot.settings;
+  S.palette = boot.palette;
+  S.month = S.month || currentMonth();
+  S.categoryId = catsOfKind()[0]?.id ?? null;
+  $("gate").classList.remove("on");
+  $("tabs").hidden = false;
+  await reload();
+}
+
+applyTheme();
+if (S.token) {
+  // При 401 экран входа уже показан с своим сообщением, здесь ловим только обрыв связи.
+  start().catch(() => { if (S.token) showGate("Сервер не отвечает. Попробуй ещё раз."); });
+} else {
+  showGate();
+}
+</script>

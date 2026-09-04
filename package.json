@@ -1,0 +1,16 @@
+{
+  "name": "kopeika-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute kopeika --remote --file=./schema.sql",
+    "db:init:local": "wrangler d1 execute kopeika --local --file=./schema.sql",
+    "test": "node test/test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

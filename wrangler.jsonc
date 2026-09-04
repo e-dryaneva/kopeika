@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kopeika",
+  "main": "src/index.js",
+  "compatibility_date": "2025-08-01",
+  "observability": { "enabled": true },
+
+  // HTML подключается как текстовый модуль, чтобы страница жила в отдельном файле.
+  "rules": [
+    { "type": "Text", "globs": ["**/*.html"], "fallthrough": true }
+  ],
+
+  "vars": {
+    // Часовой пояс для группировки по месяцам, в минутах. 180 = Москва.
+    "TZ_OFFSET_MINUTES": "180"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kopeika",
+      "database_id": "ffb88e1a-f605-4921-9960-3175a3ce02db"
+    }
+  ]
+}

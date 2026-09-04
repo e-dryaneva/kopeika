@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="b4b37b05-b3e8-4e84-ab87-cda61a033fcc"></script>
+
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics=""><style>body{margin:0;background:#f0eee9;display:flex;align-items:flex-start;justify-content:center;padding:32px 0;font-family:-apple-system,system-ui,sans-serif}a{color:#0A84FF}a:hover{color:#409CFF}input::placeholder{color:#8E8E93}::-webkit-scrollbar{width:0}#dc-root{--bg:#000;--card:#1C1C1E;--card2:#2C2C2E;--card3:#3A3A3C;--text:#fff;--muted:#636366;--dim:#48484A;--dimtext:rgba(235,235,245,.4);--tabbg:rgba(20,20,22,.92)}[data-theme="light"]{--bg:#F2F2F7;--card:#fff;--card2:#EFEFF4;--card3:#E5E5EA;--text:#000;--muted:#8E8E93;--dim:#C7C7CC;--dimtext:rgba(60,60,67,.35);--tabbg:rgba(249,249,251,.94)}</style></helmet>
+
+<x-import component-from-global-scope="IOSDevice" from="61a237ba-1072-48d9-89f8-1edcf6ccb3c2#/ios-frame.jsx" dark="{{ isDark }}" hint-size="402px,874px">
+<div data-theme="{{ themeAttr }}" style="height:100%;background:var(--bg);display:flex;flex-direction:column;font-family:-apple-system,system-ui,sans-serif;color:var(--text);overflow:hidden;position:relative">
+
+<div style="flex:1;overflow:auto;padding:80px 16px 8px">
+
+<sc-if value="{{ isEntry }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:16px;height:100%;padding-bottom:4px">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
+<div style="font-size:13px;color:#8E8E93">{{ leftLabel }}</div>
+<div style="font-size:13px;font-weight:600;color:{{ leftColor }}">{{ leftText }}</div>
+</div>
+<div style="display:flex;background:var(--card);border-radius:9px;padding:2px">
+<div style="{{ segExpense }}" sc-camel-on-click="{{ setExpense }}">Расход</div>
+<div style="{{ segIncome }}" sc-camel-on-click="{{ setIncome }}">Доход</div>
+</div>
+<div style="text-align:center;font-size:64px;font-weight:600;letter-spacing:-2.4px;color:{{ amountColor }};line-height:1.05;padding:2px 0">{{ amountText }}</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+<sc-for list="{{ cats }}" as="ct" hint-placeholder-count="9">
+<div style="{{ ct.chip }}" sc-camel-on-click="{{ ct.pick }}">{{ ct.name }}</div>
+</sc-for>
+<div style="padding:9px 14px;border-radius:999px;font-size:14px;font-weight:500;cursor:pointer;border:1px dashed var(--dim);background:transparent;color:#8E8E93" sc-camel-on-click="{{ openCats }}">＋ Категория</div>
+</div>
+<div style="flex:1;min-height:8px"></div>
+<input placeholder="Заметка" value="{{ note }}" sc-camel-on-change="{{ setNote }}" style="border:none;background:var(--card);border-radius:12px;padding:13px 16px;font-size:16px;font-family:-apple-system,system-ui;outline:none;color:var(--text)">
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+<sc-for list="{{ keys }}" as="k" hint-placeholder-count="12">
+<div style="background:var(--card);border-radius:14px;height:56px;display:flex;align-items:center;justify-content:center;font-size:27px;color:var(--text);cursor:pointer" style-active="background:var(--card3)" sc-camel-on-click="{{ k.tap }}">{{ k.label }}</div>
+</sc-for>
+</div>
+<div style="background:{{ saveBg }};border-radius:14px;height:52px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600;color:{{ saveColor }};cursor:pointer" sc-camel-on-click="{{ save }}">Сохранить</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+<div style="width:76px;height:76px;border-radius:999px;background:#30D158;display:flex;align-items:center;justify-content:center;font-size:38px;color:#000">✓</div>
+<div style="font-size:22px;font-weight:600;color:var(--text)">{{ doneText }}</div>
+<div style="font-size:15px;color:#8E8E93">{{ doneSub }}</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font-size:34px;font-weight:700;letter-spacing:-0.8px;color:var(--text);padding:0 2px">Операции</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:7px;padding:0 2px">
+<sc-for list="{{ filterChips }}" as="f" hint-placeholder-count="3">
+<div style="{{ f.style }}" sc-camel-on-click="{{ f.open }}">{{ f.label }}<span style="opacity:.7;font-size:15px;padding-left:6px">▾</span></div>
+</sc-for>
+<sc-if value="{{ filtersOn }}" hint-placeholder-val="{{ false }}">
+<div style="padding:8px 13px;border-radius:999px;font-size:13.5px;font-weight:500;cursor:pointer;background:var(--card2);color:#8E8E93" sc-camel-on-click="{{ resetFilters }}">✕ Сбросить</div>
+</sc-if>
+</div>
+
+<div style="display:flex;gap:8px">
+<div style="flex:1;background:var(--card);border-radius:14px;padding:12px 14px">
+<div style="font-size:12px;color:#8E8E93">Расходы</div>
+<div style="font-size:19px;font-weight:600;color:var(--text);margin-top:3px">{{ expenseText }}</div>
+</div>
+<div style="flex:1;background:var(--card);border-radius:14px;padding:12px 14px">
+<div style="font-size:12px;color:#8E8E93">Доходы</div>
+<div style="font-size:19px;font-weight:600;color:#30D158;margin-top:3px">{{ incomeText }}</div>
+</div>
+</div>
+<div style="font-size:12px;color:var(--muted);padding:0 4px">{{ foundText }}</div>
+<sc-if value="{{ nothingFound }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--card);border-radius:16px;padding:28px 16px;display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:4px">
+<div style="font-size:16px;color:var(--text)">Ничего не найдено</div>
+<div style="font-size:13px;color:#8E8E93">Попробуйте изменить фильтры</div>
+</div>
+</sc-if>
+
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;padding:6px 4px 0">
+<div style="font-size:13px;font-weight:600;color:#8E8E93;letter-spacing:0.2px">{{ g.label }}</div>
+<div style="font-size:13px;color:var(--muted)">{{ g.total }}</div>
+</div>
+<div style="background:var(--card);border-radius:14px;overflow:hidden">
+<sc-for list="{{ g.items }}" as="t" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:0.5px solid var(--card2)">
+<div style="width:34px;height:34px;border-radius:10px;background:var(--card2);flex:none;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1">{{ t.icon }}</div>
+<div style="flex:1;min-width:0">
+<div style="font-size:16px;color:var(--text);letter-spacing:-0.2px">{{ t.cat }}</div>
+<div style="font-size:12px;color:#8E8E93;margin-top:2px">{{ t.note }}</div>
+</div>
+<div style="font-size:16px;font-weight:500;color:{{ t.amountColor }};white-space:nowrap">{{ t.amount }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+<div style="height:8px"></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isStats }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
+<div style="font-size:34px;font-weight:700;letter-spacing:-0.8px;color:var(--text)">Обзор</div>
+<div style="width:38px;height:38px;border-radius:999px;background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text)" sc-camel-on-click="{{ toggleTheme }}">
+<svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ themeIcon }}"></path></svg>
+</div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;background:var(--card);border-radius:12px;padding:8px 6px">
+<div style="width:34px;height:30px;display:flex;align-items:center;justify-content:center;font-size:20px;color:{{ prevColor }};cursor:pointer" sc-camel-on-click="{{ prevMonth }}">‹</div>
+<div style="font-size:15px;font-weight:600;color:var(--text)">{{ monthLabel }}</div>
+<div style="width:34px;height:30px;display:flex;align-items:center;justify-content:center;font-size:20px;color:{{ nextColor }};cursor:pointer" sc-camel-on-click="{{ nextMonth }}">›</div>
+</div>
+
+<div style="background:var(--card);border-radius:18px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<div style="font-size:13px;color:#8E8E93">Лимит на месяц</div>
+<div style="font-size:13px;color:#8E8E93">{{ limitText }}</div>
+</div>
+<div style="font-size:32px;font-weight:700;letter-spacing:-1px;color:{{ mLeftColor }};line-height:1">{{ mLeftText }}</div>
+<div style="height:10px;border-radius:99px;background:var(--card2);overflow:hidden">
+<div style="height:100%;width:{{ budgetPct }};background:{{ mLeftColor }};border-radius:99px"></div>
+</div>
+<div style="font-size:12px;color:var(--muted)">{{ paceText }}</div>
+</div>
+
+<div style="background:var(--card);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<div style="font-size:15px;font-weight:600;color:var(--text)">По дням</div>
+<div style="font-size:12px;color:#8E8E93">в среднем {{ avgText }}</div>
+</div>
+<div style="display:flex;align-items:flex-end;gap:3px;height:110px">
+<sc-for list="{{ days }}" as="d" hint-placeholder-count="24">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%">
+<div style="width:100%;border-radius:3px;background:{{ d.color }};height:{{ d.h }}"></div>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
+<div>1</div><div>8</div><div>16</div><div>{{ lastDayLabel }}</div>
+</div>
+</div>
+
+<div style="background:var(--card);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:14px">
+<div style="font-size:15px;font-weight:600;color:var(--text)">По категориям</div>
+<sc-for list="{{ byCat }}" as="c" hint-placeholder-count="6">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:center;gap:9px">
+<div style="width:22px;text-align:center;font-size:15px;line-height:1">{{ c.emoji }}</div>
+<div style="flex:1;font-size:15px;color:var(--text)">{{ c.name }}</div>
+<div style="font-size:15px;color:var(--text)">{{ c.amount }}</div>
+<div style="font-size:13px;color:#8E8E93;width:38px;text-align:right">{{ c.pct }}</div>
+</div>
+<div style="height:6px;border-radius:99px;background:var(--card2);overflow:hidden">
+<div style="height:100%;width:{{ c.w }};background:{{ c.color }};border-radius:99px"></div>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="height:8px"></div>
+</div>
+</sc-if>
+
+</div>
+
+<div style="display:flex;border-top:0.5px solid var(--card2);background:var(--tabbg);padding:8px 0 26px;flex:none">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:{{ tabList }}" sc-camel-on-click="{{ goList }}">
+<svg width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
+<div style="font-size:10px;font-weight:500">Операции</div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:{{ tabEntry }}" sc-camel-on-click="{{ goEntry }}">
+<svg width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8M8 12h8"></path></svg>
+<div style="font-size:10px;font-weight:500">Запись</div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:{{ tabStats }}" sc-camel-on-click="{{ goStats }}">
+<svg width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 19V11M12 19V5M19 19v-6"></path></svg>
+<div style="font-size:10px;font-weight:500">Обзор</div>
+</div>
+</div>
+
+<sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;z-index:80" sc-camel-on-click="{{ closeSheet }}">
+<div style="width:100%;max-height:80%;background:var(--card);border-radius:22px 22px 0 0;display:flex;flex-direction:column;overflow:hidden" sc-camel-on-click="{{ stop }}">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px;flex:none">
+<div style="font-size:15px;color:#0A84FF;cursor:pointer;width:80px" sc-camel-on-click="{{ resetFilters }}">Сбросить</div>
+<div style="font-size:17px;font-weight:600;color:var(--text)">{{ sheetTitle }}</div>
+<div style="font-size:15px;font-weight:600;color:#0A84FF;cursor:pointer;width:80px;text-align:right" sc-camel-on-click="{{ closeSheet }}">Готово</div>
+</div>
+<div style="overflow:auto;padding:0 16px 30px">
+<div style="background:var(--card2);border-radius:14px;overflow:hidden">
+<sc-for list="{{ sheetRows }}" as="r" hint-placeholder-count="6">
+<div style="display:flex;align-items:center;gap:11px;padding:13px 14px;border-top:0.5px solid var(--card3);cursor:pointer" style-active="background:var(--card3)" sc-camel-on-click="{{ r.pick }}">
+<div style="{{ r.dot }}">{{ r.emoji }}</div>
+<div style="flex:1;font-size:16px;color:var(--text)">{{ r.label }}</div>
+<div style="font-size:16px;font-weight:600;color:{{ r.tickColor }}">✓</div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ catsOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;z-index:80" sc-camel-on-click="{{ closeCats }}">
+<div style="width:100%;max-height:86%;background:var(--card);border-radius:22px 22px 0 0;display:flex;flex-direction:column;overflow:hidden" sc-camel-on-click="{{ stop }}">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px;flex:none">
+<div style="font-size:15px;color:#0A84FF;cursor:pointer;width:70px" sc-camel-on-click="{{ toggleEditCats }}">{{ editCatsLabel }}</div>
+<div style="font-size:17px;font-weight:600;color:var(--text)">{{ catsTitle }}</div>
+<div style="font-size:15px;font-weight:600;color:#0A84FF;cursor:pointer;width:70px;text-align:right" sc-camel-on-click="{{ closeCats }}">Готово</div>
+</div>
+<div style="overflow:auto;padding:0 16px 30px;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ catRows }}" as="r" hint-placeholder-count="9">
+<div style="display:flex;align-items:center;gap:10px;background:var(--card2);border-radius:12px;padding:8px 12px">
+<div style="width:28px;height:28px;border-radius:8px;background:var(--card3);flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1" sc-camel-on-click="{{ r.cycle }}">{{ r.emoji }}</div>
+<input value="{{ r.name }}" sc-camel-on-change="{{ r.rename }}" placeholder="Название" style="flex:1;min-width:0;border:none;background:transparent;font-size:16px;color:var(--text);font-family:-apple-system,system-ui;outline:none">
+<div style="{{ r.delStyle }}" sc-camel-on-click="{{ r.remove }}">✕</div>
+</div>
+</sc-for>
+<div style="display:flex;align-items:center;gap:10px;border:1px dashed var(--dim);border-radius:12px;padding:11px 12px;cursor:pointer;color:#0A84FF;font-size:16px" sc-camel-on-click="{{ addCat }}">＋ Добавить категорию</div>
+<div style="font-size:12px;color:var(--muted);padding:2px 4px">Цвет меняется тапом по квадрату. Удаление не трогает уже записанные операции.</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-import>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:940},&quot;monthlyBudget&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:95000,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:10000,&quot;max&quot;:300000,&quot;step&quot;:5000,&quot;unit&quot;:&quot;₽&quot;,&quot;section&quot;:&quot;Бюджет&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Тёмная&quot;,&quot;Светлая&quot;],&quot;default&quot;:&quot;Тёмная&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Оформление&quot;}}">
+const TODAY = 24;
+const CUR_MONTH = 7;
+const FIRST_MONTH = 4;
+const DAYS_IN = [31,28,31,30,31,30,31,31,30,31,30,31];
+const MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const MONTHS_NOM = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const MONTHS_PREP = ['январе','феврале','марте','апреле','мае','июне','июле','августе','сентябре','октябре','ноябре','декабре'];
+const PALETTE = ['#FF9500','#FF375F','#0A84FF','#5E5CE6','#30D158','#BF5AF2','#64D2FF','#FFD60A','#FF453A','#8E8E93'];
+
+const CATS = [
+  { name: 'Еда', color: '#FF9500', lo: 300, hi: 2600 },
+  { name: 'Кафе', color: '#FF375F', lo: 250, hi: 1800 },
+  { name: 'Транспорт', color: '#0A84FF', lo: 60, hi: 900 },
+  { name: 'Дом', color: '#5E5CE6', lo: 500, hi: 6000 },
+  { name: 'Здоровье', color: '#30D158', lo: 400, hi: 4000 },
+  { name: 'Развлечения', color: '#BF5AF2', lo: 500, hi: 3500 },
+  { name: 'Покупки', color: '#64D2FF', lo: 700, hi: 7000 },
+  { name: 'Подписки', color: '#FFD60A', lo: 199, hi: 1200 },
+  { name: 'Прочее', color: '#8E8E93', lo: 150, hi: 2000 },
+];
+const INCOME_CATS = [
+  { name: 'Зарплата', color: '#30D158' },
+  { name: 'Аванс', color: '#34C759' },
+  { name: 'Подработка', color: '#0A84FF' },
+  { name: 'Возврат', color: '#64D2FF' },
+  { name: 'Подарок', color: '#BF5AF2' },
+  { name: 'Прочее', color: '#8E8E93' },
+];
+const ICONS = {
+  'Еда': 'M4.5 13.4c0-3.6 3.4-6.4 7.5-6.4s7.5 2.8 7.5 6.4v2.4c0 .9-.7 1.7-1.6 1.7H6.1c-.9 0-1.6-.8-1.6-1.7z M8.1 11.7c1-1.2 2.4-1.8 3.9-1.8s2.9.6 3.9 1.8',
+  'Кафе': 'M5 7.5h11v5.5a5.5 5.5 0 0 1-11 0V7.5z M16 9h2.2a2.4 2.4 0 0 1 0 4.8H16 M4.5 19.5h12',
+  'Транспорт': 'M5.2 14.5l1.7-6h10.2l1.7 6v3.2h-2.2v-1.4H7.4v1.4H5.2v-3.2z M5.6 14.5h12.8 M8 11.5h8',
+  'Дом': 'M4.5 11L12 5.2 19.5 11v8h-15v-8z M10 19v-4.5h4V19',
+  'Здоровье': 'M12 6.5v11 M6.5 12h11',
+  'Развлечения': 'M9.5 7.2l8 4.8-8 4.8V7.2z',
+  'Покупки': 'M4.5 8.5h15V19h-15V8.5z M4.5 8.5l2-3.5h11l2 3.5 M9.5 12h5',
+  'Подписки': 'M18.5 12a6.5 6.5 0 1 1-2.6-5.2 M18.6 5.6V10h-4.4',
+  'Прочее': 'M7 12h.01 M12 12h.01 M17 12h.01',
+  'Зарплата': 'M4.5 8.5h15V19h-15V8.5z M4.5 8.5L16 5v3.5 M16 13.8h.01',
+  'Аванс': 'M4.5 8.5h15V19h-15V8.5z M4.5 8.5L16 5v3.5 M16 13.8h.01',
+  'Подработка': 'M3.8 8.5h16.4V19H3.8V8.5z M9 8.5V6h6v2.5 M3.8 12.5h16.4',
+  'Возврат': 'M9 6.5l-4 4.5 4 4.5 M5.5 11h9a4 4 0 0 1 0 8h-4',
+  'Подарок': 'M4.5 9.5h15V19h-15V9.5z M12 9.5V19 M12 9.5c-3.5 0-5-1-5-2.4S8.5 4.5 12 9.5zM12 9.5c3.5 0 5-1 5-2.4S15.5 4.5 12 9.5z',
+};
+const EMOJI = {
+  'Еда': '🍞', 'Кафе': '☕️', 'Транспорт': '🚌', 'Дом': '🏠', 'Здоровье': '💊',
+  'Развлечения': '🎬', 'Покупки': '🛍', 'Подписки': '🔁', 'Прочее': '📦',
+  'Зарплата': '💰', 'Аванс': '💵', 'Подработка': '💼', 'Возврат': '↩️', 'Подарок': '🎁',
+};
+const NOTES = {
+  'Еда': ['Пятёрочка', 'ВкусВилл', 'рынок', 'Магнит'],
+  'Кафе': ['кофе с собой', 'обед', 'завтрак', 'бар'],
+  'Транспорт': ['метро', 'такси', 'самокат', 'бензин'],
+  'Дом': ['коммуналка', 'интернет', 'уборка', 'ремонт'],
+  'Здоровье': ['аптека', 'стоматолог', 'анализы'],
+  'Развлечения': ['кино', 'концерт', 'книги'],
+  'Покупки': ['одежда', 'наушники', 'подарок'],
+  'Подписки': ['музыка', 'облако', 'сериалы'],
+  'Прочее': ['', 'мелочи'],
+};
+const AMOUNT_FILTERS = [
+  { id: 'any', label: 'Любая', test: () => true },
+  { id: 'lt500', label: 'до 500', test: a => a < 500 },
+  { id: 'mid', label: '500 – 2 000', test: a => a >= 500 && a <= 2000 },
+  { id: 'gt2000', label: 'от 2 000', test: a => a > 2000 },
+];
+
+function tint(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function seedTx() {
+  const out = [];
+  let id = 0;
+  for (let m = FIRST_MONTH; m <= CUR_MONTH; m++) {
+    const r = rng(2026 * 100 + m);
+    const last = m === CUR_MONTH ? TODAY : DAYS_IN[m];
+    for (let day = 1; day <= last; day++) {
+      const n = r() < 0.12 ? 0 : 1 + Math.floor(r() * 3);
+      for (let i = 0; i < n; i++) {
+        const c = CATS[Math.floor(r() * CATS.length)];
+        const amt = Math.round((c.lo + r() * (c.hi - c.lo)) / 10) * 10;
+        const notes = NOTES[c.name];
+        out.push({ id: ++id, month: m, day, kind: 'expense', cat: c.name, color: c.color, amount: amt, note: notes[Math.floor(r() * notes.length)] });
+      }
+    }
+    out.push({ id: ++id, month: m, day: 5, kind: 'income', cat: 'Аванс', color: '#34C759', amount: 60000, note: '' });
+    if (last >= 20) out.push({ id: ++id, month: m, day: 20, kind: 'income', cat: 'Зарплата', color: '#30D158', amount: 118000, note: '' });
+    if (last >= 14 && m % 2 === 0) out.push({ id: ++id, month: m, day: 14, kind: 'income', cat: 'Подработка', color: '#0A84FF', amount: 24000, note: 'консультация' });
+  }
+  return out;
+}
+
+class Component extends DCLogic {
+  state = {
+    tab: 'entry', step: 'entry', kind: 'expense', cat: null, amount: '', note: '',
+    done: '', doneSub: '', tx: seedTx(),
+    month: CUR_MONTH, period: 'month', sheet: null, fAmount: 'any', fTags: [],
+    catsOpen: false, editCats: false, theme: null,
+    userCats: CATS.map(c => ({ name: c.name, color: c.color })),
+    userIncomeCats: INCOME_CATS.map(c => ({ name: c.name, color: c.color })),
+  };
+
+  componentDidMount() {
+    const bad = this.state.tx.some(t => t.month === undefined);
+    if (bad || this.state.tx.length < 20) this.setState({ tx: seedTx() });
+  }
+  fmt(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽'; }
+  fmtInput(digits) {
+    if (!digits) return '0 ₽';
+    const [i, d] = digits.split('.');
+    const s = (i || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return (d === undefined ? s : s + ',' + d) + ' ₽';
+  }
+  dayLabel(day, m) {
+    if (m === CUR_MONTH && day === TODAY) return 'Сегодня';
+    if (m === CUR_MONTH && day === TODAY - 1) return 'Вчера';
+    return day + ' ' + MONTHS[m];
+  }
+  color(name) {
+    const all = this.state.userCats.concat(this.state.userIncomeCats);
+    const f = all.find(c => c.name === name);
+    return f ? f.color : '#8E8E93';
+  }
+  tap(label) {
+    let v = this.state.amount;
+    if (label === '⌫') v = v.slice(0, -1);
+    else if (label === '.') { if (!v.includes('.') && v) v += '.'; }
+    else {
+      if (v.includes('.') && v.split('.')[1].length >= 2) return;
+      if (v.replace('.', '').length >= 9) return;
+      v = v === '0' ? label : v + label;
+    }
+    this.setState({ amount: v });
+  }
+  save = () => {
+    const { cat, amount, kind, note } = this.state;
+    if (!cat || !amount || Number(amount) === 0) return;
+    const tx = { id: Date.now(), month: CUR_MONTH, day: TODAY, kind, cat, color: this.color(cat), amount: Number(amount), note };
+    this.setState(s => ({
+      tx: s.tx.concat(tx), step: 'done',
+      done: (kind === 'income' ? '+ ' : '− ') + this.fmt(Number(amount)),
+      doneSub: cat + (note ? ' · ' + note : ''),
+    }));
+    setTimeout(() => this.setState({ step: 'entry', cat: null, amount: '', note: '' }), 1500);
+  };
+  mutCats(fn) {
+    const key = this.state.kind === 'income' ? 'userIncomeCats' : 'userCats';
+    this.setState(s => { const next = s[key].map(c => ({ name: c.name, color: c.color })); fn(next); return { [key]: next }; });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const limit = this.props.monthlyBudget ?? 95000;
+    const list = s.kind === 'income' ? s.userIncomeCats : s.userCats;
+    const ready = !!s.cat && !!s.amount && Number(s.amount) > 0;
+    const seg = active => 'flex:1;text-align:center;padding:7px 0;border-radius:7px;font-size:14px;font-weight:500;cursor:pointer;' +
+      (active ? 'background:var(--card3);color:var(--text);' : 'color:#8E8E93;');
+    const chip = (active, color) => 'padding:8px 13px;border-radius:999px;font-size:13.5px;font-weight:500;cursor:pointer;border:1px solid ' +
+      (active ? (color || '#0A84FF') : 'var(--card2)') + ';background:' + (active ? (color || '#0A84FF') : 'var(--card2)') +
+      ';color:' + (active ? '#000' : 'var(--text)');
+
+    // ── month scope (Обзор + месячный период)
+    const m = s.month;
+    const isCur = m === CUR_MONTH;
+    const lastDay = isCur ? TODAY : DAYS_IN[m];
+    const mTx = s.tx.filter(t => t.month === m);
+    const mExp = mTx.filter(t => t.kind === 'expense');
+    const mSpent = mExp.reduce((a, t) => a + t.amount, 0);
+    const left = limit - mSpent;
+    const expectedByNow = (limit / DAYS_IN[m]) * lastDay;
+
+    const dayTotals = [];
+    for (let d = 1; d <= DAYS_IN[m]; d++) dayTotals.push(mExp.filter(t => t.day === d).reduce((a, t) => a + t.amount, 0));
+    const maxDay = Math.max.apply(null, dayTotals.concat([1]));
+    const days = [];
+    for (let d = 0; d < lastDay; d++) days.push({
+      h: Math.max(3, (dayTotals[d] / maxDay) * 100) + '%',
+      color: isCur && d === lastDay - 1 ? '#0A84FF' : 'var(--dim)',
+    });
+
+    const catTotals = {};
+    mExp.forEach(t => { catTotals[t.cat] = (catTotals[t.cat] || 0) + t.amount; });
+    const maxCat = Math.max.apply(null, Object.values(catTotals).concat([1]));
+    const byCat = Object.keys(catTotals).sort((x, y) => catTotals[y] - catTotals[x]).map(name => ({
+      name, color: this.color(name), emoji: EMOJI[name] || '💳',
+      amount: this.fmt(catTotals[name]),
+      pct: Math.round((catTotals[name] / mSpent) * 100) + '%',
+      w: (catTotals[name] / maxCat) * 100 + '%',
+    }));
+
+    // ── операции: период + фильтры
+    const af = AMOUNT_FILTERS.find(f => f.id === s.fAmount) || AMOUNT_FILTERS[0];
+    const inPeriod = t => {
+      if (s.period === 'all') return true;
+      if (s.period === 'week') return t.month === CUR_MONTH && t.day > TODAY - 7;
+      return t.month === m;
+    };
+    const shown = s.tx.filter(t => inPeriod(t) && af.test(t.amount) && (!s.fTags.length || s.fTags.indexOf(t.cat) >= 0));
+    const shownExp = shown.filter(t => t.kind === 'expense').reduce((a, t) => a + t.amount, 0);
+    const shownInc = shown.filter(t => t.kind === 'income').reduce((a, t) => a + t.amount, 0);
+
+    const keyOf = t => t.month * 100 + t.day;
+    const keys = Array.from(new Set(shown.map(keyOf))).sort((a, b) => b - a);
+    const groups = keys.map(k => {
+      const items = shown.filter(t => keyOf(t) === k);
+      const dayExp = items.filter(t => t.kind === 'expense').reduce((a, t) => a + t.amount, 0);
+      return {
+        label: this.dayLabel(k % 100, Math.floor(k / 100)),
+        total: dayExp ? '− ' + this.fmt(dayExp) : '',
+        items: items.slice().reverse().map(t => ({
+          cat: t.cat, color: t.color, note: t.note || '—',
+          icon: EMOJI[t.cat] || '💳',
+          amount: (t.kind === 'income' ? '+ ' : '− ') + this.fmt(t.amount),
+          amountColor: t.kind === 'income' ? '#30D158' : 'var(--text)',
+        })),
+      };
+    });
+
+    const allTags = s.userCats.concat(s.userIncomeCats).filter((c, i, arr) => arr.findIndex(x => x.name === c.name) === i);
+    const filtersOn = s.fAmount !== 'any' || s.fTags.length > 0;
+
+    const periodLabel = s.period === 'week' ? '7 дней' : (s.period === 'all' ? 'Всё время' : MONTHS_NOM[m] + ' 2026');
+    const tagsLabel = s.fTags.length === 0 ? 'Теги' : (s.fTags.length === 1 ? s.fTags[0] : 'Теги · ' + s.fTags.length);
+    const amountLabel = s.fAmount === 'any' ? 'Сумма' : (AMOUNT_FILTERS.find(f => f.id === s.fAmount) || {}).label;
+    const dot = () => 'display:none';
+    const tick = on => on ? '#0A84FF' : 'transparent';
+
+    let sheetRows = [];
+    if (s.sheet === 'period') {
+      const months = [];
+      for (let i = CUR_MONTH; i >= FIRST_MONTH; i--) months.push(i);
+      sheetRows = [
+        { label: 'Всё время', on: s.period === 'all', set: { period: 'all' } },
+        { label: 'Последние 7 дней', on: s.period === 'week', set: { period: 'week' } },
+      ].concat(months.map(i => ({
+        label: MONTHS_NOM[i] + ' 2026', on: s.period === 'month' && m === i, set: { period: 'month', month: i },
+      }))).map(r => ({
+        label: r.label, dot: dot(null), tickColor: tick(r.on),
+        pick: () => this.setState(Object.assign({ sheet: null }, r.set)),
+      }));
+    } else if (s.sheet === 'amount') {
+      sheetRows = AMOUNT_FILTERS.map(f => ({
+        label: f.label, dot: dot(null), tickColor: tick(s.fAmount === f.id),
+        pick: () => this.setState({ fAmount: f.id, sheet: null }),
+      }));
+    } else if (s.sheet === 'tags') {
+      sheetRows = allTags.map(c => ({
+        label: c.name, dot: 'width:22px;text-align:center;font-size:16px;line-height:1;flex:none',
+        emoji: EMOJI[c.name] || '💳', tickColor: tick(s.fTags.indexOf(c.name) >= 0),
+        pick: () => this.setState(st => ({
+          fTags: st.fTags.indexOf(c.name) >= 0 ? st.fTags.filter(x => x !== c.name) : st.fTags.concat(c.name),
+        })),
+      }));
+    }
+
+    // ── текущий месяц для шапки экрана записи
+    const curSpent = s.tx.filter(t => t.month === CUR_MONTH && t.kind === 'expense').reduce((a, t) => a + t.amount, 0);
+    const curLeft = limit - curSpent;
+    const curPace = (limit / DAYS_IN[CUR_MONTH]) * TODAY;
+
+    const theme = s.theme || (this.props.theme === 'Светлая' ? 'light' : 'dark');
+
+    return {
+      themeAttr: theme,
+      isDark: theme === 'dark',
+      themeIcon: theme === 'dark'
+        ? 'M12 4.5v2 M12 17.5v2 M4.5 12h2 M17.5 12h2 M6.8 6.8l1.4 1.4 M15.8 15.8l1.4 1.4 M17.2 6.8l-1.4 1.4 M8.2 15.8l-1.4 1.4 M12 8.4a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2'
+        : 'M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }),
+      isEntry: s.tab === 'entry' && s.step === 'entry',
+      isDone: s.tab === 'entry' && s.step === 'done',
+      isList: s.tab === 'list',
+      isStats: s.tab === 'stats',
+      goEntry: () => this.setState({ tab: 'entry' }),
+      goList: () => this.setState({ tab: 'list' }),
+      goStats: () => this.setState({ tab: 'stats' }),
+      tabEntry: s.tab === 'entry' ? '#0A84FF' : 'var(--muted)',
+      tabList: s.tab === 'list' ? '#0A84FF' : 'var(--muted)',
+      tabStats: s.tab === 'stats' ? '#0A84FF' : 'var(--muted)',
+
+      cats: list.map(c => ({
+        name: c.name,
+        pick: () => this.setState({ cat: c.name }),
+        chip: 'padding:9px 14px;border-radius:999px;font-size:14px;font-weight:500;cursor:pointer;border:1px solid ' +
+          (s.cat === c.name ? c.color : 'var(--card2)') + ';background:' + (s.cat === c.name ? c.color : 'var(--card)') +
+          ';color:' + (s.cat === c.name ? '#000' : 'var(--text)'),
+      })),
+      keys: ['1','2','3','4','5','6','7','8','9','.','0','⌫'].map(label => ({ label, tap: () => this.tap(label) })),
+      amountText: (s.amount ? (s.kind === 'income' ? '+ ' : '− ') : '') + this.fmtInput(s.amount),
+      amountColor: s.amount ? (s.kind === 'income' ? '#30D158' : 'var(--text)') : 'var(--dim)',
+      segExpense: seg(s.kind === 'expense'),
+      segIncome: seg(s.kind === 'income'),
+      setExpense: () => this.setState({ kind: 'expense', cat: null }),
+      setIncome: () => this.setState({ kind: 'income', cat: null }),
+      note: s.note,
+      setNote: e => this.setState({ note: e.target.value }),
+      saveBg: ready ? '#30D158' : 'var(--card)',
+      saveColor: ready ? '#000' : 'var(--dimtext)',
+      save: this.save,
+      doneText: s.done,
+      doneSub: s.doneSub,
+      leftLabel: 'Осталось в ' + MONTHS_PREP[CUR_MONTH],
+      leftText: curLeft >= 0 ? this.fmt(curLeft) : '− ' + this.fmt(-curLeft),
+      leftColor: curLeft < 0 ? '#FF453A' : (curSpent > curPace ? '#FF9F0A' : '#30D158'),
+
+      // период и фильтры
+      monthLabel: MONTHS_NOM[m] + ' 2026',
+      prevMonth: () => this.setState(st => ({ month: Math.max(FIRST_MONTH, st.month - 1) })),
+      nextMonth: () => this.setState(st => ({ month: Math.min(CUR_MONTH, st.month + 1) })),
+      prevColor: m > FIRST_MONTH ? 'var(--text)' : 'var(--dim)',
+      nextColor: m < CUR_MONTH ? 'var(--text)' : 'var(--dim)',
+
+      filtersOn: filtersOn || s.period !== 'month' || m !== CUR_MONTH,
+      filterChips: [
+        { id: 'period', label: periodLabel, on: s.period !== 'month' || m !== CUR_MONTH },
+        { id: 'tags', label: tagsLabel, on: s.fTags.length > 0, color: s.fTags.length === 1 ? this.color(s.fTags[0]) : null },
+        { id: 'amount', label: amountLabel, on: s.fAmount !== 'any' },
+      ].map(f => ({ label: f.label, style: chip(f.on, f.color), open: () => this.setState({ sheet: f.id }) })),
+      sheetOpen: !!s.sheet,
+      sheetTitle: s.sheet === 'tags' ? 'Теги' : (s.sheet === 'amount' ? 'Сумма' : 'Период'),
+      closeSheet: () => this.setState({ sheet: null }),
+      sheetRows,
+      resetFilters: () => this.setState({ fAmount: 'any', fTags: [], period: 'month', month: CUR_MONTH }),
+      nothingFound: groups.length === 0,
+      foundText: shown.length + ' оп. · расходы ' + this.fmt(shownExp),
+      expenseText: this.fmt(shownExp),
+      incomeText: '+ ' + this.fmt(shownInc),
+      groups,
+
+      // обзор
+      byCat, days,
+      lastDayLabel: String(lastDay),
+      limitText: this.fmt(mSpent) + ' из ' + this.fmt(limit),
+      mLeftText: left >= 0 ? this.fmt(left) : '− ' + this.fmt(-left),
+      mLeftColor: left < 0 ? '#FF453A' : (mSpent > expectedByNow ? '#FF9F0A' : '#30D158'),
+      budgetPct: Math.max(0, Math.min(100, (mSpent / limit) * 100)) + '%',
+      paceText: mSpent > expectedByNow
+        ? 'Опережаете план на ' + this.fmt(mSpent - expectedByNow)
+        : 'Ниже графика на ' + this.fmt(expectedByNow - mSpent),
+      avgText: this.fmt(mSpent / lastDay) + ' в день',
+
+      // категории
+      catsOpen: s.catsOpen,
+      catsTitle: s.kind === 'income' ? 'Доходы' : 'Расходы',
+      openCats: () => this.setState({ catsOpen: true }),
+      closeCats: () => this.setState({ catsOpen: false, editCats: false }),
+      stop: e => e.stopPropagation(),
+      toggleEditCats: () => this.setState(st => ({ editCats: !st.editCats })),
+      editCatsLabel: s.editCats ? 'Отмена' : 'Править',
+      addCat: () => this.mutCats(next => next.push({ name: '', color: PALETTE[next.length % PALETTE.length] })),
+      catRows: list.map((c, i) => ({
+        name: c.name, color: c.color, emoji: EMOJI[c.name] || '💳',
+        cycle: () => this.mutCats(next => { next[i].color = PALETTE[(PALETTE.indexOf(next[i].color) + 1) % PALETTE.length]; }),
+        rename: e => { const v = e.target.value; this.mutCats(next => { next[i].name = v; }); },
+        remove: () => this.mutCats(next => next.splice(i, 1)),
+        delStyle: s.editCats
+          ? 'width:26px;height:26px;border-radius:999px;background:#FF453A;color:var(--text);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;flex:none'
+          : 'display:none',
+      })),
+    };
+  }
+}
+
+</script>
+
+
+</body></html>

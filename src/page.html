@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Копейка">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon.png">
+<title>Копейка</title>
+<style>
+  :root {
+    --bg:#000; --card:#1C1C1E; --card2:#2C2C2E; --card3:#3A3A3C;
+    --text:#fff; --muted:#636366; --dim:#48484A; --dimtext:rgba(235,235,245,.4);
+    --tabbg:rgba(20,20,22,.92);
+    --blue:#0A84FF; --green:#30D158; --red:#FF453A;
+  }
+  [data-theme="light"] {
+    --bg:#F2F2F7; --card:#fff; --card2:#EFEFF4; --card3:#E5E5EA;
+    --text:#000; --muted:#8E8E93; --dim:#C7C7CC; --dimtext:rgba(60,60,67,.35);
+    --tabbg:rgba(249,249,251,.94);
+  }
+
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  /* display по id перебивает штатный [hidden], поэтому задаём его явно. */
+  [hidden] { display:none !important; }
+  html, body { height:100%; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font:17px/1.4 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  button, input { font:inherit; color:inherit; border:none; background:none; }
+  button { cursor:pointer; }
+  input::placeholder { color:#8E8E93; }
+  ::-webkit-scrollbar { width:0; }
+
+  #scroll {
+    flex:1; overflow:auto; -webkit-overflow-scrolling:touch;
+    padding:calc(env(safe-area-inset-top, 0px) + 16px) 16px 8px;
+    max-width:520px; width:100%; margin-inline:auto;
+  }
+  .screen { display:none; }
+  .screen.on { display:block; }
+  /* Экран записи растягивается на всю высоту, чтобы нумпад стоял внизу. */
+  #screen-entry.on { display:flex; flex-direction:column; min-height:100%; }
+  .num { font-variant-numeric:tabular-nums; }
+  .card { background:var(--card); border-radius:14px; }
+  .h1 { font-size:34px; font-weight:700; letter-spacing:-0.8px; padding:0 2px; }
+
+  /* ---------- Запись ---------- */
+  #entry { flex:1; display:flex; flex-direction:column; gap:16px; padding-bottom:4px; }
+  .limitline { display:flex; align-items:center; justify-content:space-between; padding:0 2px; font-size:13px; }
+  .limitline .k { color:#8E8E93; }
+  .limitline .v { font-weight:600; }
+
+  .seg { display:flex; background:var(--card); border-radius:9px; padding:2px; }
+  .seg button { flex:1; padding:7px 0; border-radius:7px; font-size:15px; font-weight:500; color:#8E8E93; }
+  .seg button.on { background:var(--card3); color:var(--text); }
+
+  .amountview {
+    text-align:center; font-weight:600; letter-spacing:-2.4px; line-height:1.05;
+    padding:2px 0; white-space:nowrap; overflow:hidden;
+  }
+
+  .chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .chip {
+    padding:9px 14px; border-radius:999px; font-size:14px; font-weight:500;
+    background:var(--card); color:var(--text);
+  }
+  /* Выбранная категория — один цвет на все чипы, как у активных фильтров. */
+  .chip.on { background:var(--blue); color:#fff; }
+  .chip.add { border:1px dashed var(--dim); background:transparent; color:#8E8E93; }
+
+  #note {
+    background:var(--card); border-radius:12px; padding:13px 16px;
+    font-size:16px; outline:none; width:100%;
+  }
+  .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .pad button {
+    background:var(--card); border-radius:14px; height:56px; font-size:27px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .pad button:active { background:var(--card3); }
+  .savebtn {
+    border-radius:14px; height:52px; font-size:17px; font-weight:600;
+    background:var(--card); color:var(--muted); width:100%;
+  }
+  .savebtn.on { background:var(--blue); color:#fff; }
+
+  #done { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
+  #done .tick {
+    width:76px; height:76px; border-radius:999px; background:var(--green);
+    display:flex; align-items:center; justify-content:center; font-size:38px; color:#000;
+  }
+  #done .t { font-size:22px; font-weight:600; }
+  #done .s { font-size:15px; color:#8E8E93; text-align:center; }
+  #done-ok {
+    margin-top:8px; background:var(--blue); color:#fff; font-weight:600;
+    border-radius:14px; padding:14px 40px; font-size:17px;
+  }
+
+  /* ---------- Операции ---------- */
+  .filters { display:flex; flex-wrap:wrap; gap:7px; padding:0 2px; }
+  .filter {
+    padding:8px 13px; border-radius:999px; font-size:13.5px; font-weight:500;
+    background:var(--card); color:var(--text);
+  }
+  .filter.set { background:var(--blue); color:#fff; }
+  .filter.reset { background:var(--card2); color:#8E8E93; }
+  .filter .caret { opacity:.7; font-size:15px; padding-left:6px; }
+
+  .twocards { display:flex; gap:8px; }
+  .twocards > div { flex:1; background:var(--card); border-radius:14px; padding:12px 14px; }
+  .twocards .k { font-size:12px; color:#8E8E93; }
+  .twocards .v { font-size:19px; font-weight:600; margin-top:3px; }
+
+  .found { font-size:12px; color:var(--muted); padding:0 4px; }
+  .dayhead { display:flex; justify-content:space-between; padding:6px 4px 0; }
+  .dayhead .l { font-size:13px; font-weight:600; color:#8E8E93; letter-spacing:.2px; }
+  .dayhead .r { font-size:13px; color:var(--muted); }
+  .oprow { display:flex; align-items:center; gap:12px; padding:11px 14px; border-top:0.5px solid var(--card2); }
+  .oprow:first-child { border-top:none; }
+  .opicon {
+    width:34px; height:34px; border-radius:10px; background:var(--card2); flex:none;
+    display:flex; align-items:center; justify-content:center; font-size:18px; line-height:1;
+  }
+  .opmain { flex:1; min-width:0; }
+  .opcat { font-size:16px; letter-spacing:-0.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .opnote { font-size:12px; color:#8E8E93; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .opamount { font-size:16px; font-weight:500; white-space:nowrap; }
+  .opkill { color:var(--dim); font-size:17px; padding:2px 0 2px 4px; flex:none; }
+
+  .nothing {
+    background:var(--card); border-radius:16px; padding:28px 16px;
+    display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:4px;
+  }
+  .nothing .t { font-size:16px; }
+  .nothing .s { font-size:13px; color:#8E8E93; }
+
+  /* ---------- Обзор ---------- */
+  .statshead { display:flex; align-items:center; justify-content:space-between; padding:0 2px; }
+  .iconbtn {
+    width:38px; height:38px; border-radius:999px; background:var(--card);
+    display:flex; align-items:center; justify-content:center; color:var(--text);
+  }
+  .monthbar {
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--card); border-radius:12px; padding:8px 6px;
+  }
+  .monthbar button { width:34px; height:30px; font-size:20px; color:var(--blue); }
+  .monthbar button:disabled { color:var(--dim); }
+  .monthbar .l { font-size:15px; font-weight:600; }
+
+  .bigcard { background:var(--card); border-radius:18px; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .bigcard .row { display:flex; justify-content:space-between; align-items:baseline; }
+  .bigcard .k { font-size:13px; color:#8E8E93; }
+  .bigcard.compact { gap:9px; padding:14px 16px; }
+  .bigcard.tappable { cursor:pointer; }
+  .pace.over { color:var(--red); }
+  .bigcard.tappable:active { background:var(--card2); }
+  .chev { color:var(--blue); font-size:17px; line-height:1; padding-left:7px; vertical-align:-1px; }
+  .headbtns { display:flex; gap:8px; }
+  .bigcard .title { font-size:15px; font-weight:600; }
+  .bigleft { font-size:32px; font-weight:700; letter-spacing:-1px; line-height:1; }
+  .track { height:10px; border-radius:99px; background:var(--card2); overflow:hidden; }
+  /* Полосы прогресса везде одного цвета, даже при превышении лимита. */
+  .track > div { height:100%; border-radius:99px; background:var(--blue); }
+  .pace { font-size:12px; color:var(--muted); }
+
+  .days { display:flex; align-items:flex-end; gap:3px; height:110px; }
+  .days > div { flex:1; display:flex; flex-direction:column; justify-content:flex-end; height:100%; }
+  .days i { display:block; width:100%; border-radius:3px; }
+  .daysaxis { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); }
+
+  .catrow { display:flex; flex-direction:column; gap:6px; }
+  .catrow .line { display:flex; align-items:center; gap:9px; }
+  .catrow .e { width:22px; text-align:center; font-size:15px; line-height:1; }
+  .catrow .n { flex:1; font-size:15px; }
+  .catrow .rest { font-size:15px; text-align:right; white-space:nowrap; }
+  .catrow .track { height:6px; }
+  .catrow { cursor:pointer; }
+  .catrow .cap { font-size:11px; color:var(--muted); }
+  .catrow .cap.over { color:var(--red); }
+
+  /* Экран лимитов */
+  .limitrow {
+    display:flex; align-items:center; gap:11px; padding:11px 14px;
+    border-top:0.5px solid var(--card3);
+  }
+  .limitrow:first-child { border-top:none; }
+  .limitrow .e { width:22px; text-align:center; font-size:15px; line-height:1; }
+  .limitrow .lbl { flex:1; font-size:16px; }
+  .limitrow input {
+    width:118px; text-align:right; background:var(--card3);
+    border-radius:9px; padding:8px 10px; font-size:15px; outline:none;
+  }
+  .limithead { font-size:13px; font-weight:600; color:#8E8E93; padding:16px 4px 8px; }
+  .limithint { font-size:12px; color:var(--muted); padding:10px 4px 0; }
+
+  /* ---------- Таббар ---------- */
+  #tabs {
+    display:flex; border-top:0.5px solid var(--card2); background:var(--tabbg);
+    backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px);
+    padding:8px 0 calc(env(safe-area-inset-bottom, 0px) + 10px); flex:none;
+  }
+  #tabs button {
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--muted);
+  }
+  #tabs button.on { color:var(--blue); }
+  #tabs .lbl { font-size:10px; font-weight:500; }
+
+  /* ---------- Шторки ---------- */
+  .sheet { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:flex-end; z-index:80; }
+  .sheet .box {
+    width:100%; max-height:calc(100% - 12px); background:var(--card); border-radius:22px 22px 0 0;
+    display:flex; flex-direction:column; overflow:hidden;
+    max-width:520px; margin-inline:auto;
+  }
+  .sheet .head { display:flex; align-items:center; justify-content:space-between; padding:16px 16px 10px; flex:none; }
+  .sheet .head .side { font-size:15px; color:var(--blue); width:84px; }
+  .sheet .head .side.r { font-weight:600; text-align:right; }
+  .sheet .head .t { font-size:17px; font-weight:600; }
+  .sheet .body { overflow:auto; padding:0 16px calc(env(safe-area-inset-bottom, 0px) + 24px); }
+  .sheetlist { background:var(--card2); border-radius:14px; overflow:hidden; }
+  .sheetrow { display:flex; align-items:center; gap:11px; padding:13px 14px; border-top:0.5px solid var(--card3); width:100%; text-align:left; }
+  .sheetrow:first-child { border-top:none; }
+  .sheetrow .lbl { flex:1; font-size:16px; }
+  .sheetrow .tick { font-size:16px; font-weight:600; color:var(--blue); }
+  .dotsq { width:26px; height:26px; border-radius:8px; flex:none; display:flex; align-items:center; justify-content:center; font-size:14px; line-height:1; }
+
+  /* Правка операции — форма внутри шторки. */
+  .form { display:flex; flex-direction:column; gap:10px; padding-top:2px; }
+  .form .chip { padding:8px 13px; }
+  .form .pad { gap:7px; }
+  .form .pad button { height:46px; font-size:23px; border-radius:12px; }
+  .form .savebtn { height:48px; }
+  .delbtn {
+    height:44px; border-radius:14px; background:transparent; color:var(--red);
+    font-size:16px; font-weight:500; width:100%;
+  }
+  .delbtn:active { background:var(--card2); }
+  .form .forminput { padding:11px 14px; }
+  .form .seg { background:var(--card2); }
+  .form .seg button.on { background:var(--card3); }
+  .form .chip { background:var(--card2); }
+  .form .chip.on { background:var(--blue); color:#fff; }
+  .forminput {
+    background:var(--card2); border-radius:12px; padding:13px 16px;
+    font-size:16px; width:100%; outline:none;
+  }
+  .form .pad button { background:var(--card2); }
+  .sheet .body.tight { padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 12px); }
+  /* На невысоких экранах форма правки ужимается ещё, чтобы обойтись без скролла. */
+  @media (max-height: 720px) {
+    .form { gap:8px; }
+    .form .pad { gap:6px; }
+    .form .pad button { height:37px; font-size:20px; }
+    .form .savebtn { height:44px; }
+    .delbtn { height:38px; }
+    .form .forminput { padding:9px 14px; }
+    .form .chip { padding:7px 12px; font-size:13.5px; }
+  }
+  .form .pad button:active { background:var(--card3); }
+  .form .savebtn { background:var(--card2); }
+  .form .savebtn.on { background:var(--blue); color:#fff; }
+  .forminput[type="date"] { color-scheme:dark; }
+  [data-theme="light"] .forminput[type="date"] { color-scheme:light; }
+
+  .catedit { display:flex; flex-direction:column; gap:8px; }
+  .catedit .r { display:flex; align-items:center; gap:10px; background:var(--card2); border-radius:12px; padding:8px 12px; }
+  .catedit .r input { flex:1; min-width:0; font-size:16px; outline:none; }
+  .catedit .adder {
+    display:flex; align-items:center; gap:10px; border:1px dashed var(--dim);
+    border-radius:12px; padding:11px 12px; color:var(--blue); font-size:16px; width:100%;
+  }
+  .catedit .hint { font-size:12px; color:var(--muted); padding:2px 4px; }
+  .del { color:var(--red); font-size:15px; padding:4px 6px; }
+
+  /* ---------- Вход ---------- */
+  #gate { display:none; padding:18vh 24px 0; text-align:center; }
+  #gate.on { display:block; }
+  #gate input { width:100%; margin:16px 0 12px; text-align:center; background:var(--card); border-radius:12px; padding:13px; outline:none; }
+  #gate .go { width:100%; background:var(--blue); color:#fff; font-weight:600; border-radius:12px; padding:13px; }
+  #gate .err { color:var(--red); font-size:14px; padding-top:10px; min-height:20px; }
+</style>
+</head>
+<body>
+
+<div id="scroll">
+  <section id="gate">
+    <div style="font-size:42px">₽</div>
+    <div style="font-size:20px;font-weight:600;margin:10px 0 4px">Копейка</div>
+    <div style="font-size:14px;color:#8E8E93">Введи токен доступа</div>
+    <input id="token-input" type="password" autocomplete="off" placeholder="токен">
+    <button class="go" id="token-save">Войти</button>
+    <div class="err" id="gate-error"></div>
+  </section>
+
+  <!-- Запись -->
+  <section class="screen" id="screen-entry">
+    <div id="entry">
+      <div class="limitline">
+        <div class="k" id="limit-k">Осталось в этом месяце</div>
+        <button class="v num" id="limit-v"></button>
+      </div>
+      <div class="seg">
+        <button id="seg-expense">Расход</button>
+        <button id="seg-income">Доход</button>
+      </div>
+      <div id="amount" class="amountview num">0 ₽</div>
+      <div class="chips" id="entry-cats"></div>
+      <div style="flex:1;min-height:8px"></div>
+      <input id="note" placeholder="Заметка">
+      <div class="pad" id="pad"></div>
+      <button id="save" class="savebtn">Сохранить</button>
+    </div>
+    <div id="done" hidden>
+      <div class="tick">✓</div>
+      <div class="t">Записано</div>
+      <div class="s" id="done-sub"></div>
+      <button id="done-ok">Понятно</button>
+    </div>
+  </section>
+
+  <!-- Операции -->
+  <section class="screen" id="screen-list">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="h1">Операции</div>
+      <div class="filters" id="filters"></div>
+      <div class="twocards">
+        <div><div class="k">Расходы</div><div class="v num" id="l-expense"></div></div>
+        <div><div class="k">Доходы</div><div class="v num" id="l-income" style="color:var(--green)"></div></div>
+      </div>
+      <div class="found" id="found"></div>
+      <div id="groups" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div style="height:8px"></div>
+    </div>
+  </section>
+
+  <!-- Обзор -->
+  <section class="screen" id="screen-stats">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="statshead">
+        <div class="h1">Обзор</div>
+        <div class="headbtns">
+          <button class="iconbtn" id="limits-open" aria-label="Лимиты">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round">
+              <path d="M4 8h8M17 8h3M4 16h3M12 16h8"></path>
+              <circle cx="14.5" cy="8" r="2.2"></circle>
+              <circle cx="9.5" cy="16" r="2.2"></circle>
+            </svg>
+          </button>
+          <button class="iconbtn" id="theme-toggle" aria-label="Тема">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path id="theme-path"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div class="monthbar">
+        <button id="s-prev">‹</button>
+        <div class="l" id="s-month"></div>
+        <button id="s-next">›</button>
+      </div>
+
+      <div class="bigcard">
+        <div class="k" id="spent-k"></div>
+        <div class="bigleft num" id="spent-value"></div>
+      </div>
+
+      <div class="bigcard compact tappable" id="budget-card">
+        <div class="row">
+          <div class="k">Лимит на месяц</div>
+          <div class="k num"><span id="budget-of"></span><span class="chev">›</span></div>
+        </div>
+        <div class="track" id="budget-track"><div id="budget-fill"></div></div>
+        <div class="pace" id="budget-pace"></div>
+      </div>
+
+      <div class="bigcard">
+        <div class="row">
+          <div class="title">По дням</div>
+          <div class="k num" id="days-avg"></div>
+        </div>
+        <div class="days" id="days"></div>
+        <div class="daysaxis" id="days-axis"></div>
+      </div>
+
+      <div class="bigcard" id="bycat-card">
+        <div class="title">По категориям</div>
+        <div id="bycat" style="display:flex;flex-direction:column;gap:14px"></div>
+      </div>
+      <div style="height:8px"></div>
+    </div>
+  </section>
+</div>
+
+<nav id="tabs" hidden>
+  <button data-tab="list">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
+    <span class="lbl">Операции</span>
+  </button>
+  <button data-tab="entry">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8M8 12h8"></path></svg>
+    <span class="lbl">Запись</span>
+  </button>
+  <button data-tab="stats">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 19V11M12 19V5M19 19v-6"></path></svg>
+    <span class="lbl">Обзор</span>
+  </button>
+</nav>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="box">
+    <div class="head">
+      <button class="side" id="sheet-left"></button>
+      <div class="t" id="sheet-title"></div>
+      <button class="side r" id="sheet-done">Готово</button>
+    </div>
+    <div class="body" id="sheet-body"></div>
+  </div>
+</div>
+
+<!--APP-->
+</body>
+</html>
