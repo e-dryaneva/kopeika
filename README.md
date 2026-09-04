@@ -64,7 +64,8 @@ npx wrangler secret put API_TOKEN
 npm run deploy
 ```
 
-В конце wrangler напечатает адрес вида `https://kopeika.<твоё-имя>.workers.dev`.
+В конце wrangler напечатает адрес. Для этого проекта он уже выложен:
+**https://kopeika.dryaneva.workers.dev**
 
 ## Быстрая команда на Кнопку действия
 
@@ -72,7 +73,7 @@ npm run deploy
 
 1. **Запросить ввод** — тип «Текст», вопрос «Трата?»
 2. **Загрузить содержимое URL**
-   - URL: `https://kopeika.<твоё-имя>.workers.dev/api/entry`
+   - URL: `https://kopeika.dryaneva.workers.dev/api/entry`
    - Способ: `POST`
    - Заголовки: `Authorization` → `Bearer ТВОЙ_ТОКЕН`
    - Тело запроса: `JSON`, поле `text` (текст) → значение «Предоставленный ввод»
